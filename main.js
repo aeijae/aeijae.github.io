@@ -12,7 +12,7 @@ function generateName() {
         return;
 
     }
-    const lastName = " di Luca";
+    const lastName = " De Luca";
     const text ="Sedunimesi on ";
     const firstName = nameParts[0].toLowerCase();
 
