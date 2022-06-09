@@ -3,75 +3,114 @@ let tempo = document.getElementById('tempo');
 tempo.textContent = metronome.tempo;
 
 const playPauseIcon = document.getElementById('play-pause-icon');
-
 const playButton = document.getElementById('play-button');
+const tapTempoButton = document.getElementById('tap-button');
 
+const MaxTapCountsToConsider = 5;
+
+let lastTaps = [];
 let incrementSize = 10;
 
 const setVisibleTempo = (newTempo) => {
     tempo.textContent = newTempo;
 };
 
-playButton.addEventListener('click', function() {
+playButton.addEventListener('click', () => {
     metronome.startStop();
-
-    if (metronome.isRunning) {
-        playPauseIcon.className = 'pause';
-    }
-    else {
-        playPauseIcon.className = 'play';
-    }
-
+    playPauseIcon.className = metronome.isRunning ? 'pause' : 'play';
 });
 
-const changeTempo = ({ key }) => {
+tapTempoButton.addEventListener('click', () => {
+    const maxDiff = 5000;
+
+    if (lastTaps.length === MaxTapCountsToConsider) {
+        lastTaps.shift();
+    }
+
+    const previousTap = lastTaps[lastTaps.length - 1];
+    const lastTap = new Date().getTime();
+
+    if (lastTap - previousTap > maxDiff) {
+        lastTaps = [lastTap];
+        return;
+    }
+
+    lastTaps.push(lastTap);
+
+    if (lastTaps.length < 3) {
+        return;
+    }
+
+    let diffSum = 0;
+
+    for (let i = 0; i < lastTaps.length - 1; i++) {
+        diffSum += lastTaps[i + 1] - lastTaps[i];
+    }
+
+    const diffAverageMs = diffSum / (lastTaps.length - 1);
+
+    setTempo(Math.round(60 / (diffAverageMs / 1000)));
+});
+
+const setTempo = (newTempo) => {
+    metronome.tempo = newTempo;
+    setVisibleTempo(metronome.tempo);
+};
+
+const handleShortcut = ({key}) => {
+    if (document.activeElement.localName === 'input') return;
+
+    lastTaps = [];
     switch (parseInt(key)) {
-        case 1: metronome.tempo -= incrementSize;
+        case 1:
+            setTempo(metronome.tempo - incrementSize);
             break;
-        case 2: metronome.tempo -= 1;
+        case 2:
+            setTempo(metronome.tempo - 1);
             break;
-        case 3: metronome.tempo += 1;
+        case 3:
+            setTempo(metronome.tempo + 1);
             break;
-        case 4: metronome.tempo += incrementSize;
+        case 4:
+            setTempo(metronome.tempo + incrementSize);
             break;
         default:
     }
-
-    setVisibleTempo(metronome.tempo);
 }
 
-document.addEventListener("keyup", changeTempo);
+document.addEventListener("keyup", handleShortcut);
 
-const tempoChangeButtons = document.getElementsByClassName('tempo-change');
+Array.from(document.getElementsByClassName('tempo-change'))
+    .forEach(b => b.addEventListener('click', function () {
+        lastTaps = [];
+        setTempo(metronome.tempo + parseInt(this.dataset.change));
+    }));
 
-for (let i = 0; i < tempoChangeButtons.length; i++) {
-    tempoChangeButtons[i].addEventListener('click', function() {
-        metronome.tempo += parseInt(this.dataset.change);
-        setVisibleTempo(metronome.tempo);
-    });
-}
+Array.from(document.getElementsByClassName('tempo-increment'))
+    .forEach(b => b.addEventListener('click', function () {
+        lastTaps = [];
+        setTempo(metronome.tempo + parseInt(this.textContent));
+    }));
 
-const tempoStepButtons = document.getElementsByClassName('tempo-increment');
+const getPositiveInteger = (handler) => (evt) => {
+    const newIncrement = evt.target.value;
+    const parsed = parseInt(newIncrement);
 
-for (let i = 0; i < tempoStepButtons.length; i++) {
-    tempoStepButtons[i].addEventListener('click', function() {
-        metronome.tempo += parseInt(this.textContent);
-        setVisibleTempo(metronome.tempo);
-    });
-}
+    if (isNaN(parsed) || parsed <= 0) return;
 
-const changeIncrement = () => {
-  const newIncrement = document.getElementById("increment").value;
-  const parsed = parseInt(newIncrement);
-
-  if (parsed === NaN || parsed <= 0) return;
-
-  incrementSize = newIncrement;
-
-  document.getElementById("drop").textContent = '-' + incrementSize;
-  document.getElementById("add").textContent = '+' + incrementSize;
+    handler(parsed);
 };
 
-const incrementSizeInput = document.getElementById("increment");
+const changeIncrement = (increment) => {
+    incrementSize = increment;
 
-incrementSizeInput.addEventListener("keyup", changeIncrement);
+    document.getElementById("drop").textContent = '-' + incrementSize;
+    document.getElementById("add").textContent = '+' + incrementSize;
+};
+
+const changeSubdivision = (subdivision) => {
+    metronome.beatsPerBar = subdivision;
+}
+
+document.getElementById("increment").addEventListener("keyup", getPositiveInteger(changeIncrement));
+document.getElementById("subdivision").addEventListener("keyup", getPositiveInteger(changeSubdivision));
