@@ -93,8 +93,8 @@ Array.from(document.getElementsByClassName('tempo-increment'))
     }));
 
 const getPositiveInteger = (handler) => (evt) => {
-    const newIncrement = evt.target.value;
-    const parsed = parseInt(newIncrement);
+    const newValue = evt.target.value;
+    const parsed = parseInt(newValue);
 
     if (isNaN(parsed) || parsed <= 0) return;
 
@@ -108,9 +108,14 @@ const changeIncrement = (increment) => {
     document.getElementById("add").textContent = '+' + incrementSize;
 };
 
+const changeBeatsPerBar = (beatsPerBar) => {
+    metronome.beatsPerBar = beatsPerBar;
+}
+
 const changeSubdivision = (subdivision) => {
-    metronome.beatsPerBar = subdivision;
+    metronome.subdivisionsPerBeat = subdivision;
 }
 
 document.getElementById("increment").addEventListener("keyup", getPositiveInteger(changeIncrement));
 document.getElementById("subdivision").addEventListener("keyup", getPositiveInteger(changeSubdivision));
+document.getElementById("time-signature").addEventListener("keyup", getPositiveInteger(changeBeatsPerBar));

@@ -5,7 +5,9 @@ class Metronome
         this.audioContext = null;
         this.notesInQueue = [];         // notes that have been put into the web audio and may or may not have been played yet {note, time}
         this.currentBeatInBar = 0;
+        this.currentSubdivision = 0;
         this.beatsPerBar = 4;
+        this.subdivisionsPerBeat = 1;
         this.tempo = tempo;
         this.lookahead = 25;          // How frequently to call scheduling function (in milliseconds)
         this.scheduleAheadTime = 0.1;   // How far ahead to schedule audio (sec)
@@ -17,27 +19,42 @@ class Metronome
     nextNote()
     {
         // Advance current note and time by a quarter note (crotchet if you're posh)
-        var secondsPerBeat = 60.0 / this.tempo; // Notice this picks up the CURRENT tempo value to calculate beat length.
+        const secondsPerBeat = 60.0 / this.tempo / (this.subdivisionsPerBeat); // Notice this picks up the CURRENT tempo value to calculate beat length.
         this.nextNoteTime += secondsPerBeat; // Add beat length to last beat time
-    
+
+        this.currentSubdivision++;
+
+        if (this.currentSubdivision >= this.subdivisionsPerBeat) {
+            this.currentSubdivision = 0;
+        }
+
+        if (this.currentSubdivision > 0) return;
+
         this.currentBeatInBar++;    // Advance the beat number, wrap to zero
-        if (this.currentBeatInBar == this.beatsPerBar) {
+
+        if (this.currentBeatInBar === this.beatsPerBar) {
             this.currentBeatInBar = 0;
         }
     }
 
-    scheduleNote(beatNumber, time)
+    scheduleNote(beatNumber, subdivisionNumber, time)
     {
         // push the note on the queue, even if we're not playing.
-        this.notesInQueue.push({ note: beatNumber, time: time });
-    
+        this.notesInQueue.push({ note: beatNumber, subdivisionNumber, time });
+
         // create an oscillator
         const osc = this.audioContext.createOscillator();
         const envelope = this.audioContext.createGain();
 
-        const isFirstBeat = beatNumber % this.beatsPerBar == 0;
+        const isFirstBeat = beatNumber % this.beatsPerBar === 0;
+        const isSubdivision = subdivisionNumber > 0;
 
-        osc.frequency.value = isFirstBeat ? 1300 : 800;
+        osc.frequency.value = isFirstBeat && !isSubdivision
+            ? 1300
+            : isSubdivision
+                ? 800
+                : 1100;
+
         envelope.gain.value = isFirstBeat ? 5 : 1;
         envelope.gain.exponentialRampToValueAtTime(1, time + 0.001);
         envelope.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
@@ -53,7 +70,7 @@ class Metronome
     {
         // while there are notes that will need to play before the next interval, schedule them and advance the pointer.
         while (this.nextNoteTime < this.audioContext.currentTime + this.scheduleAheadTime ) {
-            this.scheduleNote(this.currentBeatInBar, this.nextNoteTime);
+            this.scheduleNote(this.currentBeatInBar, this.currentSubdivision, this.nextNoteTime);
             this.nextNote();
         }
     }
@@ -70,6 +87,7 @@ class Metronome
         this.isRunning = true;
 
         this.currentBeatInBar = 0;
+        this.currentSubdivision = 0;
         this.nextNoteTime = this.audioContext.currentTime + 0.05;
 
         this.intervalID = setInterval(() => this.scheduler(), this.lookahead);
